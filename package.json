@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "dev": "npm --prefix eventfix run dev",
+    "build": "npm --prefix eventfix run build",
+    "lint": "npm --prefix eventfix run lint",
+    "preview": "npm --prefix eventfix run preview"
+  }
+}
