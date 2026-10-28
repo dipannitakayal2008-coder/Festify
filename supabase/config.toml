@@ -1,0 +1,4 @@
+project_id = "festify"
+
+[functions.id-auth]
+verify_jwt = false

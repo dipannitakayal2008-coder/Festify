@@ -6,6 +6,7 @@ import {
 } from "react";
 import { supabase, supabaseConfigError } from "./supabaseClient.js";
 import { AuthContext } from "./authContext.js";
+import { isDemoUser } from "./demoAuth.js";
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -63,9 +64,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const userId = session?.user?.id;
+  const demoUser = isDemoUser(session?.user);
 
   useEffect(() => {
-    if (!supabase || !userId) return undefined;
+    if (demoUser || !supabase || !userId) return undefined;
 
     let active = true;
 
@@ -114,15 +116,38 @@ export function AuthProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [demoUser, userId]);
+
+  const signInDemo = useCallback((demoSession) => {
+    if (!isDemoUser(demoSession?.user)) {
+      throw new Error("This sign-in session could not be verified.");
+    }
+    window.history.replaceState({}, "", `/${demoSession.user.app_metadata.role}`);
+    setSession(demoSession);
+    setSessionError("");
+    setAccount({
+      loading: false,
+      error: "",
+      profile: { full_name: demoSession.user.user_metadata.full_name },
+      roles: [demoSession.user.app_metadata.role],
+      userId: demoSession.user.id,
+    });
+  }, []);
 
   const signOut = useCallback(async () => {
+    if (isDemoUser(session?.user)) {
+      window.history.replaceState({}, "", "/");
+      setSession(null);
+      setAccount({ loading: false, error: "", profile: null, roles: [], userId: null });
+      setPasswordRecovery(false);
+      return;
+    }
     if (!supabase) throw new Error(supabaseConfigError);
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    setAccount({ loading: false, error: "", profile: null, roles: [] });
+    setAccount({ loading: false, error: "", profile: null, roles: [], userId: null });
     setPasswordRecovery(false);
-  }, []);
+  }, [session]);
 
   const value = useMemo(() => ({
     supabase,
@@ -131,20 +156,31 @@ export function AuthProvider({ children }) {
     session,
     sessionLoading,
     sessionError,
-    account: {
-      ...account,
-      loading: account.loading || Boolean(userId && account.userId !== userId),
-    },
+    account: demoUser
+      ? {
+          loading: false,
+          error: "",
+          profile: { full_name: session.user.user_metadata.full_name },
+          roles: [session.user.app_metadata.role],
+          userId: session.user.id,
+        }
+      : {
+          ...account,
+          loading: account.loading || Boolean(userId && account.userId !== userId),
+        },
     passwordRecovery,
     setPasswordRecovery,
+    signInDemo,
     signOut,
   }), [
     session,
     sessionLoading,
     sessionError,
     account,
+    demoUser,
     userId,
     passwordRecovery,
+    signInDemo,
     signOut,
   ]);
 
